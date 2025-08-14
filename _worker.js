@@ -36,7 +36,7 @@ const CORS_HEADER_OPTIONS = {
 };
 
 // SNI Custom Configuration
-const customSNI = ""; // Kosongkan untuk default, atau isi dengan SNI pilihan Anda
+const customSNI = "www.iflix.com"; // Kosongkan untuk default, atau isi dengan SNI pilihan Anda
 
 async function getKVProxyList(kvProxyUrl = KV_PROXY_URL) {
     if (!kvProxyUrl) {
