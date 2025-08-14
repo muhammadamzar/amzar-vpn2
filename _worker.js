@@ -1066,11 +1066,6 @@ class CloudflareApi {
     }
 }
 
-// HTML page base
-/**
- * Cloudflare worker gak support DOM API, tetapi mereka menggunakan HTML Rewriter.
- * Tapi, karena kelihatannta repot kalo pake HTML Rewriter. Kita pake cara konfensional saja...
- */
 let baseHTML = `
 <!DOCTYPE html>
 <html lang="en" id="html" class="scroll-auto scrollbar-hide dark">
@@ -1141,21 +1136,23 @@ let baseHTML = `
         </div>
       </div>
     </div>
-    <div class="container">
+    <!-- Fixed: Added proper margin-left to account for sidebar -->
+    <div class="ml-14">
       <div
         id="container-title"
-        class="sticky bg-white dark:bg-neutral-800 border-b-2 border-neutral-800 dark:border-white z-10 py-6 w-screen"
+        class="sticky bg-white dark:bg-neutral-800 border-b-2 border-neutral-800 dark:border-white z-10 py-6"
       >
         <h1 class="text-xl text-center text-neutral-800 dark:text-white">
           PLACEHOLDER_JUDUL
         </h1>
       </div>
-      <div class="flex gap-6 pt-10 w-screen justify-center">
+      <!-- Fixed: Removed w-screen and flex gap, added proper container -->
+      <div class="pt-10">
         PLACEHOLDER_PROXY_GROUP
       </div>
 
       <!-- Pagination -->
-      <nav id="container-pagination" class="w-screen mt-8 sticky bottom-0 right-0 left-0 transition -translate-y-6 z-20">
+      <nav id="container-pagination" class="mt-8 sticky bottom-0 right-0 left-0 transition -translate-y-6 z-20">
         <ul class="flex justify-center space-x-4">
           PLACEHOLDER_PAGE_BUTTON
         </ul>
