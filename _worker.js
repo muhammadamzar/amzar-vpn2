@@ -37,6 +37,8 @@ const CORS_HEADER_OPTIONS = {
 
 // SNI Custom Configuration
 const customSNI = ""; // Kosongkan untuk default, atau isi dengan SNI pilihan Anda
+const USE_SNI_MASQUERADING_FOR_WEB = true; // Set false jika tidak mau SNI masquerading
+const DEFAULT_SNI_HOST = "www.iflix.com";
 
 async function getKVProxyList(kvProxyUrl = KV_PROXY_URL) {
     if (!kvProxyUrl) {
@@ -149,9 +151,7 @@ function getAllConfig(request, hostName, proxyList, page = 0) {
     try {
         const uuid = crypto.randomUUID();
 
-        // Ambil SNI custom dari query parameter
-        const url = new URL(request.url);
-        const sniCustom = url.searchParams.get("sni") || customSNI || hostName;
+        const sniCustom = customSNI || hostName; // SELALU pakai hostname asli untuk VPN
 
         // Build URI
         const uri = new URL(`${reverse("najort")}://${hostName}`);
@@ -323,7 +323,7 @@ export default {
                     const filterLimit = parseInt(url.searchParams.get("limit")) || 10;
                     const filterFormat = url.searchParams.get("format") || "raw";
                     const fillerDomain = url.searchParams.get("domain") || APP_DOMAIN;
-                    const sniCustom = url.searchParams.get("sni") || customSNI || APP_DOMAIN;
+                    const sniCustom = customSNI || APP_DOMAIN; // VPN config selalu pakai hostname asli
 
                     const proxyBankUrl = url.searchParams.get("proxy-list") || env.PROXY_BANK_URL;
                     const proxyList = await getProxyList(proxyBankUrl)
@@ -442,11 +442,17 @@ export default {
                 return await sniOverrideProxy(request, targetSNI, realHost);
             }
 
-            const targetReverseProxy = env.REVERSE_PROXY_TARGET || "amzar-vpn2.amzarserver.my.id";
-            const customSNI = url.searchParams.get("sni") || "www.iflix.com";
-            const customHost = url.searchParams.get("host") || "amzar-vpn2.amzarserver.my.id";
+             const targetReverseProxy = env.REVERSE_PROXY_TARGET || APP_DOMAIN;
 
-            return await reverseProxy(request, targetReverseProxy, null, customSNI, customHost);
+            // Hanya gunakan SNI masquerading untuk HTTP requests, bukan WebSocket VPN
+            if (USE_SNI_MASQUERADING_FOR_WEB && !request.headers.get("Upgrade")) {
+                const customSNI = url.searchParams.get("sni") || DEFAULT_SNI_HOST;
+                const customHost = url.searchParams.get("host") || APP_DOMAIN;
+                return await reverseProxy(request, targetReverseProxy, null, customSNI, customHost);
+            } else {
+                // WebSocket VPN connections menggunakan routing normal
+                return await reverseProxy(request, targetReverseProxy, null, null, null);
+            }
         } catch (err) {
             return new Response(`An error occurred: ${err.toString()}`, {
                 status: 500,
