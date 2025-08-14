@@ -159,13 +159,7 @@ function getAllConfig(request, hostName, proxyList, page = 0) {
                     uri.searchParams.set("security", port == 443 ? "tls" : "none");
                     
                     // Set SNI dengan support custom SNI
-                    if (port == 80 && protocol == reverse("sselv")) {
-                        uri.searchParams.set("sni", "");
-                    } else if (port == 443) {
-                        uri.searchParams.set("sni", sniCustom);
-                    } else {
-                        uri.searchParams.set("sni", "");
-                    }
+                    uri.searchParams.set("sni", sniCustom);
 
                     // Build VPN URI
                     proxies.push(uri.toString());
@@ -338,13 +332,7 @@ export default {
                                 uri.searchParams.set("security", port == 443 ? "tls" : "none");
                                 
                                 // Set SNI dengan support custom SNI
-                                if (port == 80 && protocol == reverse("sselv")) {
-                                    uri.searchParams.set("sni", "");
-                                } else if (port == 443) {
-                                    uri.searchParams.set("sni", sniCustom);
-                                } else {
-                                    uri.searchParams.set("sni", "");
-                                }
+                                uri.searchParams.set("sni", sniCustom);
                                 
                                 uri.searchParams.set("path", `/${proxy.proxyIP}-${proxy.proxyPort}`);
 
