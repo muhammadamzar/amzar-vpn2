@@ -35,6 +35,9 @@ const CORS_HEADER_OPTIONS = {
     "Access-Control-Max-Age": "86400",
 };
 
+// SNI Custom Configuration
+const customSNI = ""; // Kosongkan untuk default, atau isi dengan SNI pilihan Anda
+
 async function getKVProxyList(kvProxyUrl = KV_PROXY_URL) {
     if (!kvProxyUrl) {
         throw new Error("No KV Proxy URL Provided!");
@@ -109,6 +112,10 @@ function getAllConfig(request, hostName, proxyList, page = 0) {
 
     try {
         const uuid = crypto.randomUUID();
+        
+        // Ambil SNI custom dari query parameter
+        const url = new URL(request.url);
+        const sniCustom = url.searchParams.get("sni") || customSNI || hostName;
 
         // Build URI
         const uri = new URL(`${reverse("najort")}://${hostName}`);
@@ -150,7 +157,15 @@ function getAllConfig(request, hostName, proxyList, page = 0) {
 
                     uri.protocol = protocol;
                     uri.searchParams.set("security", port == 443 ? "tls" : "none");
-                    uri.searchParams.set("sni", port == 80 && protocol == reverse("sselv") ? "" : hostName);
+                    
+                    // Set SNI dengan support custom SNI
+                    if (port == 80 && protocol == reverse("sselv")) {
+                        uri.searchParams.set("sni", "");
+                    } else if (port == 443) {
+                        uri.searchParams.set("sni", sniCustom);
+                    } else {
+                        uri.searchParams.set("sni", "");
+                    }
 
                     // Build VPN URI
                     proxies.push(uri.toString());
@@ -278,6 +293,7 @@ export default {
                     const filterLimit = parseInt(url.searchParams.get("limit")) || 10;
                     const filterFormat = url.searchParams.get("format") || "raw";
                     const fillerDomain = url.searchParams.get("domain") || APP_DOMAIN;
+                    const sniCustom = url.searchParams.get("sni") || customSNI || APP_DOMAIN;
 
                     const proxyBankUrl = url.searchParams.get("proxy-list") || env.PROXY_BANK_URL;
                     const proxyList = await getProxyList(proxyBankUrl)
@@ -320,7 +336,16 @@ export default {
                                 }
 
                                 uri.searchParams.set("security", port == 443 ? "tls" : "none");
-                                uri.searchParams.set("sni", port == 80 && protocol == reverse("sselv") ? "" : APP_DOMAIN);
+                                
+                                // Set SNI dengan support custom SNI
+                                if (port == 80 && protocol == reverse("sselv")) {
+                                    uri.searchParams.set("sni", "");
+                                } else if (port == 443) {
+                                    uri.searchParams.set("sni", sniCustom);
+                                } else {
+                                    uri.searchParams.set("sni", "");
+                                }
+                                
                                 uri.searchParams.set("path", `/${proxy.proxyIP}-${proxy.proxyPort}`);
 
                                 uri.hash = `${result.length + 1} ${getFlagEmoji(proxy.country)} ${proxy.org} WS ${port == 443 ? "TLS" : "NTLS"
