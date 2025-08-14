@@ -35,11 +35,6 @@ const CORS_HEADER_OPTIONS = {
     "Access-Control-Max-Age": "86400",
 };
 
-// SNI Custom Configuration
-const customSNI = ""; // Kosongkan untuk default, atau isi dengan SNI pilihan Anda
-const USE_SNI_MASQUERADING_FOR_WEB = true; // Set false jika tidak mau SNI masquerading
-const DEFAULT_SNI_HOST = "www.iflix.com";
-
 async function getKVProxyList(kvProxyUrl = KV_PROXY_URL) {
     if (!kvProxyUrl) {
         throw new Error("No KV Proxy URL Provided!");
@@ -86,28 +81,15 @@ async function getProxyList(proxyBankUrl = PROXY_BANK_URL) {
     return cachedProxyList;
 }
 
-async function reverseProxy(request, target, targetPath, customSNI = null, customHost = null) {
+async function reverseProxy(request, target, targetPath) {
     const targetUrl = new URL(request.url);
     const targetChunk = target.split(":");
 
-    // Jika ada custom SNI, gunakan itu untuk hostname (untuk TLS handshake)
-    if (customSNI) {
-        targetUrl.hostname = customSNI;
-    } else {
-        targetUrl.hostname = targetChunk[0];
-    }
-
+    targetUrl.hostname = targetChunk[0];
     targetUrl.port = targetChunk[1]?.toString() || "443";
     targetUrl.pathname = targetPath || targetUrl.pathname;
 
     const modifiedRequest = new Request(targetUrl, request);
-
-    // Set Host header ke tujuan asli atau custom host
-    if (customHost) {
-        modifiedRequest.headers.set("Host", customHost);
-    } else {
-        modifiedRequest.headers.set("Host", targetChunk[0]);
-    }
 
     modifiedRequest.headers.set("X-Forwarded-Host", request.headers.get("Host"));
 
@@ -122,36 +104,11 @@ async function reverseProxy(request, target, targetPath, customSNI = null, custo
     return newResponse;
 }
 
-async function sniOverrideProxy(request, targetSNI = "www.iflix.com", realHost = "amzar-vpn2.amzarserver.my.id") {
-    const url = new URL(request.url);
-    url.hostname = targetSNI; // ini yang menentukan SNI saat TLS handshake (www.iflix.com)
-    url.protocol = "https:";  // agar pakai TLS
-
-    // Clone request tapi ganti host header ke tujuan asli
-    const newRequest = new Request(url, request);
-    newRequest.headers.set("Host", realHost); // amzar-vpn2.amzarserver.my.id
-
-    // Kirim request
-    const response = await fetch(newRequest, {
-        headers: newRequest.headers,
-    });
-
-    const newResponse = new Response(response.body, response);
-    for (const [key, value] of Object.entries(CORS_HEADER_OPTIONS)) {
-        newResponse.headers.set(key, value);
-    }
-    newResponse.headers.set("X-Proxied-By", "Cloudflare Worker SNI Override");
-
-    return newResponse;
-}
-
 function getAllConfig(request, hostName, proxyList, page = 0) {
     const startIndex = PROXY_PER_PAGE * page;
 
     try {
         const uuid = crypto.randomUUID();
-
-        const sniCustom = customSNI || hostName; // SELALU pakai hostname asli untuk VPN
 
         // Build URI
         const uri = new URL(`${reverse("najort")}://${hostName}`);
@@ -193,9 +150,7 @@ function getAllConfig(request, hostName, proxyList, page = 0) {
 
                     uri.protocol = protocol;
                     uri.searchParams.set("security", port == 443 ? "tls" : "none");
-
-                    // Set SNI dengan support custom SNI
-                    uri.searchParams.set("sni", sniCustom);
+                    uri.searchParams.set("sni", port == 80 && protocol == reverse("sselv") ? "" : hostName);
 
                     // Build VPN URI
                     proxies.push(uri.toString());
@@ -323,7 +278,6 @@ export default {
                     const filterLimit = parseInt(url.searchParams.get("limit")) || 10;
                     const filterFormat = url.searchParams.get("format") || "raw";
                     const fillerDomain = url.searchParams.get("domain") || APP_DOMAIN;
-                    const sniCustom = customSNI || APP_DOMAIN; // VPN config selalu pakai hostname asli
 
                     const proxyBankUrl = url.searchParams.get("proxy-list") || env.PROXY_BANK_URL;
                     const proxyList = await getProxyList(proxyBankUrl)
@@ -366,10 +320,7 @@ export default {
                                 }
 
                                 uri.searchParams.set("security", port == 443 ? "tls" : "none");
-
-                                // Set SNI dengan support custom SNI
-                                uri.searchParams.set("sni", sniCustom);
-
+                                uri.searchParams.set("sni", port == 80 && protocol == reverse("sselv") ? "" : APP_DOMAIN);
                                 uri.searchParams.set("path", `/${proxy.proxyIP}-${proxy.proxyPort}`);
 
                                 uri.hash = `${result.length + 1} ${getFlagEmoji(proxy.country)} ${proxy.org} WS ${port == 443 ? "TLS" : "NTLS"
@@ -434,25 +385,10 @@ export default {
                         }
                     );
                 }
-            } else if (url.pathname.startsWith("/sni")) {
-                // KODE BARU DITAMBAHKAN DI SINI
-                const targetSNI = url.searchParams.get("target_sni") || "www.iflix.com";
-                const realHost = url.searchParams.get("real_host") || "amzar-vpn2.amzarserver.my.id";
-
-                return await sniOverrideProxy(request, targetSNI, realHost);
             }
 
-             const targetReverseProxy = env.REVERSE_PROXY_TARGET || APP_DOMAIN;
-
-            // Hanya gunakan SNI masquerading untuk HTTP requests, bukan WebSocket VPN
-            if (USE_SNI_MASQUERADING_FOR_WEB && !request.headers.get("Upgrade")) {
-                const customSNI = url.searchParams.get("sni") || DEFAULT_SNI_HOST;
-                const customHost = url.searchParams.get("host") || APP_DOMAIN;
-                return await reverseProxy(request, targetReverseProxy, null, customSNI, customHost);
-            } else {
-                // WebSocket VPN connections menggunakan routing normal
-                return await reverseProxy(request, targetReverseProxy, null, null, null);
-            }
+            const targetReverseProxy = env.REVERSE_PROXY_TARGET || "example.com";
+            return await reverseProxy(request, targetReverseProxy);
         } catch (err) {
             return new Response(`An error occurred: ${err.toString()}`, {
                 status: 500,
